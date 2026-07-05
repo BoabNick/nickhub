@@ -1,91 +1,131 @@
-# Nickhub
+# Nickhub + Supabase Auth Integration
 
-Nickhub is a self-hosted cinematic media hub rebuilt from the ideas in Streamer for a web workflow. It includes a private community dashboard, movie metadata search, direct authorized playback, debrid provider handoff, Stremio-style addon manifest inspection, and Docker deployment files.
+This adds a complete, beautiful **email + password login/signup flow** with Supabase Auth to your existing Nickhub project.
 
-## What is included
+Your repo already has:
+- Next.js App Router + TypeScript + Tailwind
+- Supabase client/server setup in `src/lib/supabase/`
+- Supabase project connected (for DB)
 
-- Cinematic Next.js App Router movie home UI
-- Settings menu for app name, profile, metadata keys, debrid tokens, playback defaults, and addon manifests
-- Searchable movie metadata route at `/api/movies/search`
-- In-page video player for direct authorized HTTPS streams
-- Legal magnet/HTTPS source resolver route at `/api/debrid/resolve`
-- Addon manifest inspector at `/api/addons/inspect`
-- Health endpoint at `/api/health`
-- Dockerfile and `docker-compose.yml` for container hosting
-- Generated Nickhub logo, hero, addon, icon, and community assets in `public/assets`
+We are now enabling **Supabase Authentication** on top of it.
 
-## Movie search
+## Files to Add
 
-Nickhub can search movie metadata through TMDB. Add either `TMDB_API_KEY` or `TMDB_READ_TOKEN` as server environment variables, or enter a TMDB credential in the Settings menu. Without a TMDB key, the home page still works with bundled open-movie demo titles.
+Copy the following into your local clone of `nickhub`:
 
-## Settings
+```
+src/app/login/page.tsx
+src/app/signup/page.tsx
+src/app/auth/confirm/route.ts
+```
 
-Open **Settings** in the header to edit:
+(You can also add middleware later for automatic protection of routes like `/settings` or your community dashboard.)
 
-- App name and room/profile label
-- Metadata credential mode and TMDB credentials
-- Default debrid provider and provider tokens
-- Default source URL or magnet
-- Autoplay and safe-search behavior
-- Addon manifest URL list
+## Step-by-Step Instructions
 
-Settings entered in the UI are stored in this browser's local storage. Server environment variables remain useful for shared deployments.
+### 1. Enable Auth in Supabase Dashboard
+1. Go to your Supabase project (axdhcinekndhwsoxwgab)
+2. **Authentication → Providers → Email** → Enable it
+3. **Authentication → URL Configuration** → Add these **Redirect URLs**:
+   - `http://localhost:3000/auth/confirm`
+   - `https://your-nickhub-domain.com/auth/confirm`
+4. **Authentication → Password strength & leaked password protection** → Turn **ON** "Prevent the use of leaked passwords"
+5. (Recommended for dev) You can temporarily disable "Enable email confirmations" while testing.
 
-## Streaming
+### 2. Copy the Files
+From this folder, copy into your project root:
 
-The home page can play direct HTTPS media URLs that you are authorized to access. For debrid workflows, paste a legal magnet URI or provider-supported HTTPS source, choose a provider, and resolve it through `/api/debrid/resolve`.
+```bash
+# Example commands (run from your nickhub folder)
+cp -r artifacts/nickhub-supabase-auth/src/app/login src/app/
+cp -r artifacts/nickhub-supabase-auth/src/app/signup src/app/
+cp -r artifacts/nickhub-supabase-auth/src/app/auth src/app/
+```
 
-## Debrid providers
+Or manually create the folders and paste the code.
 
-The resolver supports user-provided legal magnets or HTTPS links for:
+### 3. Update Navigation (Recommended)
+Add links in your header/navbar (probably in `src/app/layout.tsx` or a Header component):
 
-- Real-Debrid (`REAL_DEBRID_TOKEN`)
-- AllDebrid (`ALLDEBRID_TOKEN`)
-- Premiumize (`PREMIUMIZE_TOKEN`)
-- Debrid-Link (`DEBRID_LINK_TOKEN`)
-- Offcloud (`OFFCLOUD_TOKEN`)
+```tsx
+<Link href="/login" className="...">Sign in</Link>
+<Link href="/signup" className="...">Sign up</Link>
+```
 
-Tokens can be configured as server environment variables or entered in the Settings menu. Browser-entered tokens are sent only to this self-hosted app's resolver route for the current request.
+After login, you can show user email + logout button.
 
-## Addons
+### 4. Protect Routes (Next Step)
+Once auth is working, protect your community dashboard / settings pages:
 
-Nickhub accepts HTTPS Stremio-style manifest URLs. The inspector validates the manifest and blocks private-network URLs to avoid exposing internal services.
+- Option A (simple): Add session check at the top of those pages (like the dashboard example below).
+- Option B (better): Add `middleware.ts` at root for automatic redirects.
 
-## Supabase backend
+Example middleware (create `src/middleware.ts`):
 
-Nickhub connects to the **Nickhub** Supabase project (`axdhcinekndhwsoxwgab`).
+```ts
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-1. Copy `.env.example` to `.env.local` and fill in:
-   - `NEXT_PUBLIC_SUPABASE_URL` — `https://axdhcinekndhwsoxwgab.supabase.co`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — the anon/publishable key from
-     **Supabase Dashboard → Project Settings → API**
-2. Client helpers live in `src/lib/supabase/`:
-   - `client.ts` — browser client for Client Components
-   - `server.ts` — cookie-aware client for Server Components, Route Handlers,
-     and Server Actions
-3. Verify connectivity at `GET /api/db/status`. It returns
-   `{ "status": "ok", "configured": true }` when the app can reach Supabase.
+export async function middleware(request: NextRequest) {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            request.cookies.set(name, value)
+          )
+        },
+      },
+    }
+  )
 
-On Vercel, add the same two variables under **Project Settings → Environment
-Variables** (they are provided automatically if the project is linked through
-the Vercel + Supabase integration).
+  const { data: { session } } = await supabase.auth.getSession()
 
-## Coolify deployment
+  // Protect these routes
+  const protectedPaths = ['/settings', '/community', '/dashboard']
+  const isProtected = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
-1. Create a Coolify project named `nickhub`.
-2. Add a Git deploy key with access to this repository.
-3. Create a Docker Compose application from the `main` branch using `docker-compose.yml`.
-4. Set the domain to `https://thirty4x.com` on the `nickhub` service.
-5. Expose port `3000` and use `/api/health` as the health check path.
-6. Optionally run `scripts/deploy-coolify.sh` after exporting `COOLIFY_*` variables.
+  if (isProtected && !session) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
 
-## Container deployment
+  return NextResponse.next()
+}
 
-1. Deploy this repository as a Dockerfile or Docker Compose application.
-2. Set optional server environment variables for shared TMDB and debrid credentials.
-3. Expose port `3000`.
-4. Use `/api/health` as the health check path.
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
+```
 
-## Legal use
+### 5. Test the Flow
+1. `npm run dev`
+2. Visit http://localhost:3000/login
+3. Create account → confirm email (or skip confirmation in Supabase)
+4. Login → should redirect to wherever you point it (currently `/dashboard` — change to your community page)
 
-Nickhub does not ship copyrighted source catalogs or bundled torrents. Use it only with media you own, public-domain/open media, or sources you are legally authorized to access.
+## What You Get
+- Beautiful dark cinematic-themed login & signup screens matching Nickhub vibe
+- Full email/password auth with Supabase
+- Leaked password protection support
+- Email confirmation flow (`/auth/confirm`)
+- Auto redirect if already logged in
+- Password visibility toggle
+- Clean error/success messaging
+- Ready for user-specific features (personal watchlists, settings per user_id, etc.)
+
+## Next Ideas for Nickhub
+- Store user settings in Supabase table `user_settings` (user_id, theme, default_debrid, etc.)
+- Personal "My Library" or watch history
+- Community features gated behind login
+
+Let me know if you want:
+- Dark mode refinements
+- Integration with existing Header component
+- User settings page example using Supabase
+- Full middleware
+- Logout button component
+
+You're now one step closer to a full authenticated media hub! 🎥

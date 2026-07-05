@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { UserSettings } from "@/types/supabase";
 
 /**
@@ -12,9 +13,15 @@ import type { UserSettings } from "@/types/supabase";
  */
 export function useUserSettings() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Start settled when Supabase is unconfigured so the effect never has to
+  // call setState synchronously (which triggers cascading renders).
+  const [loading, setLoading] = useState(() => isSupabaseConfigured());
 
   const fetchSettings = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      return;
+    }
+
     const supabase = createClient();
     const {
       data: { user },
@@ -37,10 +44,11 @@ export function useUserSettings() {
     } else if (data) {
       setSettings(data as UserSettings);
     } else {
-      // First sign-in: create the default settings row.
+      // First sign-in: create the default settings row. `upsert` keeps this
+      // idempotent if two tabs/devices race on the same `user_id`.
       const { data: created, error: insertError } = await supabase
         .from("user_settings")
-        .insert({ user_id: user.id })
+        .upsert({ user_id: user.id }, { onConflict: "user_id" })
         .select()
         .single();
 
@@ -56,6 +64,10 @@ export function useUserSettings() {
 
   const updateSettings = useCallback(
     async (updates: Partial<Omit<UserSettings, "user_id" | "created_at" | "updated_at">>) => {
+      if (!isSupabaseConfigured()) {
+        return { data: null, error: new Error("Supabase is not configured.") };
+      }
+
       const supabase = createClient();
       const {
         data: { user },
@@ -82,6 +94,9 @@ export function useUserSettings() {
   );
 
   useEffect(() => {
+    // `fetchSettings` only calls setState after awaiting network work, so it
+    // cannot cause the synchronous cascading render this rule guards against.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchSettings();
   }, [fetchSettings]);
 

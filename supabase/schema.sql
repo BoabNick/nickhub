@@ -8,7 +8,7 @@ create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   username text unique,
   avatar_url text,
-  created_at timestamptz default now()
+  created_at timestamptz not null default now()
 );
 
 -- User settings: per-user integrations and playback preferences.
@@ -16,16 +16,16 @@ create table if not exists public.profiles (
 -- RLS, but consider Supabase Vault or server-side encryption for hardening.
 create table if not exists public.user_settings (
   user_id uuid references auth.users on delete cascade primary key,
-  app_name text default 'Nickhub',
+  app_name text not null default 'Nickhub',
   tmdb_api_key text,
   debrid_provider text,
   debrid_api_token text,
-  binge_mode_enabled boolean default true,
-  auto_advance_delay_seconds integer default 5,
-  preferred_quality text default '1080p',
-  theme text default 'dark',
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  binge_mode_enabled boolean not null default true,
+  auto_advance_delay_seconds integer not null default 5,
+  preferred_quality text not null default '1080p',
+  theme text not null default 'dark',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 alter table public.profiles enable row level security;

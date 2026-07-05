@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
@@ -19,6 +20,14 @@ export default function SignUpPage() {
   const handleSignUp = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
+
+    if (!isSupabaseConfigured()) {
+      toast.error("Sign up unavailable", {
+        description: "Supabase is not configured for this deployment.",
+      });
+      setLoading(false);
+      return;
+    }
 
     const supabase = createClient();
     const { data, error } = await supabase.auth.signUp({ email, password });

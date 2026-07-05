@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useUserSettings } from "@/hooks/use-user-settings";
+import type { UserSettings } from "@/types/supabase";
 
 const debridProviders = [
   { id: "real-debrid", name: "Real-Debrid" },
@@ -30,25 +31,49 @@ const qualities = ["4K", "1080p", "720p"];
 export default function SettingsPage() {
   const { settings, loading, updateSettings } = useUserSettings();
 
-  const [appName, setAppName] = useState("");
-  const [tmdbApiKey, setTmdbApiKey] = useState("");
-  const [debridProvider, setDebridProvider] = useState("");
-  const [debridApiToken, setDebridApiToken] = useState("");
-  const [bingeMode, setBingeMode] = useState(true);
-  const [autoAdvanceDelay, setAutoAdvanceDelay] = useState(5);
-  const [preferredQuality, setPreferredQuality] = useState("1080p");
-  const [saving, setSaving] = useState(false);
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#070711] text-slate-300">
+        Loading settings...
+      </main>
+    );
+  }
 
-  useEffect(() => {
-    if (!settings) return;
-    setAppName(settings.app_name);
-    setTmdbApiKey(settings.tmdb_api_key ?? "");
-    setDebridProvider(settings.debrid_provider ?? "");
-    setDebridApiToken(settings.debrid_api_token ?? "");
-    setBingeMode(settings.binge_mode_enabled);
-    setAutoAdvanceDelay(settings.auto_advance_delay_seconds);
-    setPreferredQuality(settings.preferred_quality);
-  }, [settings]);
+  if (!settings) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#070711] text-white">
+        <p className="text-slate-300">Sign in to manage your settings.</p>
+        <Button asChild className="rounded-full bg-violet-500 px-6 font-black text-white hover:bg-violet-400">
+          <Link href="/auth/signin">Sign in</Link>
+        </Button>
+      </main>
+    );
+  }
+
+  return <SettingsForm settings={settings} updateSettings={updateSettings} />;
+}
+
+type UpdateSettings = ReturnType<typeof useUserSettings>["updateSettings"];
+
+/**
+ * The editable form. It mounts only once `settings` has loaded, so local form
+ * state can be initialised lazily from props — no effect syncing required.
+ */
+function SettingsForm({
+  settings,
+  updateSettings,
+}: {
+  settings: UserSettings;
+  updateSettings: UpdateSettings;
+}) {
+  const [appName, setAppName] = useState(settings.app_name);
+  const [tmdbApiKey, setTmdbApiKey] = useState(settings.tmdb_api_key ?? "");
+  const [debridProvider, setDebridProvider] = useState(settings.debrid_provider ?? "");
+  const [debridApiToken, setDebridApiToken] = useState(settings.debrid_api_token ?? "");
+  const [bingeMode, setBingeMode] = useState(settings.binge_mode_enabled);
+  const [autoAdvanceDelay, setAutoAdvanceDelay] = useState(settings.auto_advance_delay_seconds);
+  const [preferredQuality, setPreferredQuality] = useState(settings.preferred_quality);
+  const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -73,25 +98,6 @@ export default function SettingsPage() {
       });
     }
   };
-
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#070711] text-slate-300">
-        Loading settings...
-      </main>
-    );
-  }
-
-  if (!settings) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#070711] text-white">
-        <p className="text-slate-300">Sign in to manage your settings.</p>
-        <Button asChild className="rounded-full bg-violet-500 px-6 font-black text-white hover:bg-violet-400">
-          <Link href="/auth/signin">Sign in</Link>
-        </Button>
-      </main>
-    );
-  }
 
   return (
     <main className="min-h-screen bg-[#070711] px-4 py-12 text-white">

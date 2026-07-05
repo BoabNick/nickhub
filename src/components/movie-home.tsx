@@ -1,16 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import {
   BadgeCheck,
-  Bell,
-  ChevronRight,
-  CirclePlay,
   Clapperboard,
+  CirclePlay,
   CloudLightning,
   Copy,
   ExternalLink,
-  Film,
+  Info,
   KeyRound,
   Magnet,
   MonitorPlay,
@@ -19,15 +18,14 @@ import {
   Search,
   Server,
   Settings2,
-  ShieldCheck,
-  Sparkles,
-  UsersRound,
   Video,
   WandSparkles,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { DiscoverySection } from "@/components/discover/discovery-section";
+import { GenreChips } from "@/components/discover/genre-chips";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -255,6 +253,10 @@ export function MovieHome() {
     [settings.addonManifests],
   );
 
+  // The discovery rows only forward a raw TMDB API key header; a read-token
+  // credential falls back to the server's own TMDB env vars if configured.
+  const tmdbApiKeyForDiscovery = settings.metadataMode === "apiKey" ? settings.tmdbApiKey : undefined;
+
   const updateDraft = <Key extends keyof AppSettings>(key: Key, value: AppSettings[Key]) => {
     setDraftSettings((current) => ({ ...current, [key]: value }));
   };
@@ -461,88 +463,45 @@ export function MovieHome() {
       </div>
 
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#070711]/85 backdrop-blur-2xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="relative h-11 w-11 overflow-hidden rounded-2xl border border-violet-300/30 bg-violet-500/15 shadow-lg shadow-violet-950/60">
-              <Image src="/assets/nickhub-logo.png" alt="Nickhub logo" fill className="object-cover" sizes="44px" />
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="relative h-10 w-10 overflow-hidden rounded-2xl border border-violet-300/30 bg-violet-500/15 shadow-lg shadow-violet-950/60">
+              <Image src="/assets/nickhub-logo.png" alt="Nickhub logo" fill className="object-cover" sizes="40px" />
             </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tight">{settings.appName}</h1>
-              <p className="hidden text-xs text-slate-400 sm:block">{settings.profileName} • Search • Find • Stream authorized sources</p>
-            </div>
+            <h1 className="hidden text-lg font-black tracking-tight sm:block">{settings.appName}</h1>
           </div>
 
-          <nav className="hidden items-center gap-5 text-sm font-semibold text-slate-300 md:flex">
-            <a href="#search" className="hover:text-white">Search</a>
+          <form onSubmit={searchMovies} className="relative mx-auto hidden w-full max-w-md flex-1 md:block">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search movies & shows..."
+              className="h-10 rounded-full border-white/10 bg-white/[0.06] pl-10 text-sm text-white placeholder:text-slate-500 focus-visible:ring-violet-300"
+            />
+          </form>
+
+          <nav className="ml-auto hidden items-center gap-5 text-sm font-semibold text-slate-300 md:flex">
+            <Link href="/discover" className="hover:text-white">Discover</Link>
+            <a href="#library" className="hover:text-white">Library</a>
             <a href="#player" className="hover:text-white">Player</a>
-            <a href="#sources" className="hover:text-white">Sources</a>
-            <a href="#server" className="hover:text-white">Server</a>
           </nav>
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 hover:text-white">
-              <Bell className="h-4 w-4" />
-            </Button>
-            <Button onClick={openSettings} className="rounded-full bg-violet-500 font-black text-white hover:bg-violet-400">
+          <div className="ml-auto flex items-center gap-2 md:ml-0">
+            <Button onClick={openSettings} variant="ghost" size="icon" className="rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 hover:text-white">
               <Settings2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-4 pb-10 pt-6 sm:px-6 lg:grid-cols-[1fr_0.82fr] lg:px-8 lg:pt-10" id="search">
-        <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/[0.07] p-5 shadow-2xl shadow-black/35 backdrop-blur-xl sm:p-8">
-          <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
-          <div className="relative z-10">
-            <Badge className="mb-5 rounded-full border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-cyan-100 hover:bg-cyan-300/15">
-              <Sparkles className="mr-1 h-3.5 w-3.5" />
-              Movie search home
-            </Badge>
-            <h2 className="max-w-4xl text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl lg:text-7xl">
-              Find a title, attach a source, press play.
-            </h2>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-              Search movie metadata, pick a result, then stream a direct HTTPS file or resolve your own legal magnet/debrid source inside {settings.appName}.
-            </p>
+      <section className="relative flex min-h-[62vh] w-full items-end overflow-hidden sm:min-h-[70vh]">
+        <MovieBackdrop movie={activeMovie} src={featuredBackdrop} />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#070711] via-[#070711]/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#070711]/90 via-[#070711]/20 to-transparent" />
 
-            <form onSubmit={searchMovies} className="mt-7 flex flex-col gap-3 rounded-[1.75rem] border border-white/10 bg-black/25 p-2 sm:flex-row">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search any movie title..."
-                  className="h-14 rounded-[1.35rem] border-white/10 bg-white/[0.06] pl-12 text-base text-white placeholder:text-slate-500 focus-visible:ring-violet-300"
-                />
-              </div>
-              <Button disabled={isSearching} className="h-14 rounded-[1.35rem] bg-violet-500 px-7 text-base font-black text-white hover:bg-violet-400">
-                {isSearching ? "Searching..." : "Search"}
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </form>
-
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { icon: Film, label: "Metadata search", value: settings.metadataMode === "server" ? "Server" : "Local key" },
-                { icon: Magnet, label: "Debrid source", value: "5 APIs" },
-                { icon: MonitorPlay, label: "Browser player", value: "Ready" },
-                { icon: ShieldCheck, label: "Source policy", value: "BYO" },
-              ].map((item) => (
-                <div key={item.label} className="rounded-3xl border border-white/10 bg-black/25 p-4">
-                  <item.icon className="mb-3 h-5 w-5 text-violet-200" />
-                  <p className="text-lg font-black">{item.value}</p>
-                  <p className="text-xs font-medium text-slate-400">{item.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <aside className="relative min-h-[440px] overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#101025] shadow-2xl shadow-black/40">
-          <MovieBackdrop movie={activeMovie} src={featuredBackdrop} />
-          <div className="absolute inset-0 bg-[#080812]/45" />
-          <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 sm:pb-14 lg:px-8">
+          <div className="max-w-2xl">
             <div className="mb-3 flex flex-wrap gap-2">
               {activeMovie.genres.slice(0, 3).map((genre) => (
                 <Badge key={genre} className="rounded-full border-white/15 bg-black/35 text-slate-100 backdrop-blur-md hover:bg-black/45">
@@ -550,28 +509,41 @@ export function MovieHome() {
                 </Badge>
               ))}
             </div>
-            <h3 className="text-4xl font-black tracking-tight sm:text-5xl">{activeMovie.title}</h3>
-            <p className="mt-2 text-sm font-semibold text-slate-300">
+            <h2 className="text-4xl font-black leading-[0.95] tracking-tight sm:text-6xl lg:text-7xl">{activeMovie.title}</h2>
+            <p className="mt-3 text-sm font-semibold text-slate-300">
               {activeMovie.year} {activeMovie.runtime ? `• ${activeMovie.runtime}` : ""} {activeMovie.rating ? `• ★ ${activeMovie.rating.toFixed(1)}` : ""}
             </p>
-            <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-300">{activeMovie.overview}</p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button onClick={playDemo} className="rounded-full bg-white px-5 font-black text-[#101020] hover:bg-violet-100">
+            <p className="mt-4 line-clamp-3 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">{activeMovie.overview}</p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button onClick={playDemo} className="h-12 rounded-full bg-white px-6 font-black text-[#101020] hover:bg-violet-100">
                 <Play className="h-4 w-4 fill-current" />
-                Play if available
+                Play
               </Button>
-              <Button asChild variant="outline" className="rounded-full border-white/15 bg-white/5 font-bold text-white hover:bg-white/10 hover:text-white">
-                <a href="#sources">
-                  <Magnet className="h-4 w-4" />
-                  Add source
+              <Button asChild variant="outline" className="h-12 rounded-full border-white/15 bg-white/10 px-6 font-bold text-white backdrop-blur-md hover:bg-white/20 hover:text-white">
+                <a href="#library">
+                  <Info className="h-4 w-4" />
+                  More info
                 </a>
               </Button>
             </div>
           </div>
-        </aside>
+        </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl space-y-3 px-4 pt-8 sm:px-6 lg:px-8">
+        <GenreChips type="movie" apiKey={tmdbApiKeyForDiscovery} />
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+        <DiscoverySection
+          title="Trending This Week"
+          endpoint="/api/tmdb/trending?type=movie&window=week"
+          href="/discover/trending"
+          apiKey={tmdbApiKeyForDiscovery}
+        />
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-10 pt-10 sm:px-6 lg:px-8" id="library">
         <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.24em] text-violet-200">Results</p>
@@ -963,5 +935,5 @@ function MovieBackdrop({ movie, src }: { movie: Movie; src: string }) {
     return <img src={src} alt={`${movie.title} backdrop`} className="absolute inset-0 h-full w-full object-cover opacity-80" />;
   }
 
-  return <Image src={src} alt={`${movie.title} backdrop`} fill className="object-cover opacity-80" sizes="(min-width: 1024px) 42vw, 100vw" />;
+  return <Image src={src} alt={`${movie.title} backdrop`} fill priority className="object-cover opacity-80" sizes="100vw" />;
 }
